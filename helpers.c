@@ -1,21 +1,22 @@
 #include "helpers.h"
-#include "math.h"
-#include "ctype.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
 
 // Convert image to grayscale
 void grayscale(int height, int width, RGBTRIPLE image[height][width])
 {
-    // iterate through height and width of 2d array
-    for (int i = 0; i < height; i++)
+    for (int i = 0; i < height; ++i)
     {
-        for (int j = 0; j < width; j++)
+        for (int j = 0; j < width; ++j)
         {
-            // find average of RGB values and make them the same, lower number is darker
+            // Iterate through each pixel, replacing RGB values with average
             int avg = round((image[i][j].rgbtRed + image[i][j].rgbtGreen + image[i][j].rgbtBlue) / 3.0);
-            image[i][j].rgbtRed = avg;
-            image[i][j].rgbtGreen = avg;
-            image[i][j].rgbtBlue = avg;
+            image[i][j] = (RGBTRIPLE)
+            {
+                avg, avg, avg
+            };
         }
     }
     return;
@@ -24,32 +25,20 @@ void grayscale(int height, int width, RGBTRIPLE image[height][width])
 // Convert image to sepia
 void sepia(int height, int width, RGBTRIPLE image[height][width])
 {
-    // nested loops iterating through each pixel again
-    for (int k = 0; k < height; k++)
-    {
-        for (int l = 0; l < width; l++)
-        {
-            int sepiaRed = round((image[k][l].rgbtRed * 0.393) + (image[k][l].rgbtGreen * 0.769) + (image[k][l].rgbtBlue * 0.189));
-            // RGB value caps at 255, maybe there's a better way than using a conditional, like a function for the math
-            if (sepiaRed > 255)
-            {
-                sepiaRed = 255;
-            }
-            int sepiaGreen = round((image[k][l].rgbtRed * 0.349) + (image[k][l].rgbtGreen * 0.686) + (image[k][l].rgbtBlue * 0.168));
-            if (sepiaGreen > 255)
-            {
-                sepiaGreen = 255;
-            }
-            int sepiaBlue = round((image[k][l].rgbtRed * 0.272) + (image[k][l].rgbtGreen * 0.534) + (image[k][l].rgbtBlue * 0.131));
-            if (sepiaBlue > 255)
-            {
-                sepiaBlue = 255;
-            }
 
-            // changing pixel to sepia color
-            image[k][l].rgbtRed = sepiaRed;
-            image[k][l].rgbtGreen = sepiaGreen;
-            image[k][l].rgbtBlue = sepiaBlue;
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            // Given sepia conversion algorithm
+            int sepiaRed = round(0.393 * image[i][j].rgbtRed + 0.769 * image[i][j].rgbtGreen + 0.189 * image[i][j].rgbtBlue);
+            int sepiaGreen = round(0.349 * image[i][j].rgbtRed + 0.686 * image[i][j].rgbtGreen + 0.168 * image[i][j].rgbtBlue);
+            int sepiaBlue = round(0.272 * image[i][j].rgbtRed + 0.534 * image[i][j].rgbtGreen + 0.131 * image[i][j].rgbtBlue);
+
+            // 255 8-bit color cap
+            image[i][j].rgbtRed = sepiaRed > 255 ? 255 : sepiaRed;
+            image[i][j].rgbtGreen = sepiaGreen > 255 ? 255 : sepiaGreen;
+            image[i][j].rgbtBlue = sepiaBlue > 255 ? 255 : sepiaBlue;
         }
     }
     return;
@@ -58,19 +47,16 @@ void sepia(int height, int width, RGBTRIPLE image[height][width])
 // Reflect image horizontally
 void reflect(int height, int width, RGBTRIPLE image[height][width])
 {
-    for (int m = 0; m < height; m++)
+    for (int i = 0; i < height; ++i)
     {
-        // don't reflect in half, need to use pointers
-        for (int n = 0; n < width / 2; n++)
+        for (int j = 0; j < width / 2; ++j)
         {
-            // tmp = pointer to pixel, or image[m][n]
-            // tmp = *a
-            // *a = *b
-            // *b = tmp
-            RGBTRIPLE tmp = image[m][n];
-            RGBTRIPLE tmp2 = image[m][(width - 1) - n];
-            image[m][(width - 1) - n] = tmp;
-            image[m][n] = tmp2;
+            // make copies of current and last
+            RGBTRIPLE curr = image[i][j];
+            RGBTRIPLE next = image[i][width - 1 - j];
+            // switch
+            image[i][j] = next;
+            image[i][width - 1 - j] = curr;
         }
     }
     return;
@@ -79,55 +65,42 @@ void reflect(int height, int width, RGBTRIPLE image[height][width])
 // Blur image
 void blur(int height, int width, RGBTRIPLE image[height][width])
 {
-    // make a copy so blurred pixels don't affect next blur
+
+    // creating a copy so blurs don't overlap
     RGBTRIPLE copy[height][width];
-    for (int x = 0; x < height; x++)
+    memcpy(copy, image, sizeof(RGBTRIPLE) * height * width);
+
+    for (int i = 0; i < height; ++i)
     {
-        for (int y = 0; y < width; y++)
+        for (int j = 0; j < width; ++j)
         {
-            copy[x][y] = image[x][y];
-        }
-    }
+            // number of valid pixels, float to round division
+            float c = 0.0;
 
-    // looping through each pixel in the copy
-    for (int o = 0; o < height; o++)
-    {
+            // sum of pixels around
+            int blurRed = 0, blurGreen = 0, blurBlue = 0;
 
-        for (int p = 0; p < width; p++)
-        {
-
-            // divisor is float for implicit conversion to round
-            float count = 0.0;
-            int blur_red = 0;
-            int blur_green = 0;
-            int blur_blue = 0;
-
-
-            for (int q = -1; q < 2; q++)
+            // iterate in a 3x3 around curr
+            for (int k = -1; k < 2; ++k)
             {
-                // from image[][r - 1 to r + 1]
-                for (int r = -1; r < 2; r++)
+                for (int l = -1; l < 2; ++l)
                 {
-                    // how to check if pixel is valid? four inequalities
-                    // height + q greater than 0, less than height -1
-                    // width + q greater than 0, less than width -1
-                    if ((o + q >= 0) && (o + q <= height - 1) && (p + r >= 0) && (p + r <= width - 1))
+                    // current pixel postion to validate
+                    int row = i + k, col = l + j;
+                    // check if within boundaries
+                    if ((row >= 0) && (row <= height - 1) && (col >= 0) && (col <= width - 1))
                     {
-                        // add valid pixel rgb values to variable
-                        blur_red += copy[o + q][p + r].rgbtRed;
-                        blur_green += copy[o + q][p + r].rgbtGreen;
-                        blur_blue += copy[o + q][p + r].rgbtBlue;
-                        // add one more to divisor
-                        count++;
+                        blurRed += copy[row][col].rgbtRed;
+                        blurGreen += copy[row][col].rgbtGreen;
+                        blurBlue += copy[row][col].rgbtBlue;
+                        ++c;
                     }
                 }
             }
-
-
-            // change image, not copy
-            image[o][p].rgbtRed = round(blur_red / count);
-            image[o][p].rgbtGreen = round(blur_green / count);
-            image[o][p].rgbtBlue = round(blur_blue / count);
+            image[i][j] = (RGBTRIPLE)
+            {
+                round(blurBlue / c), round(blurGreen / c), round(blurRed / c)
+            };
         }
     }
     return;
