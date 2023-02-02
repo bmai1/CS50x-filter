@@ -1,2 +1,2 @@
 # CS50x-filter
-includes grayscale, sepia, reflection, blur filters
+includes grayscale, sepia, reflection, blur filter
